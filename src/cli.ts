@@ -1,0 +1,301 @@
+/**
+ * Command-Line Interface router for lh-report-gen.
+ */
+
+import * as fs from 'fs';
+import { buildStatementOfApplicability } from './compliance_mapper';
+import {
+  formatAuditJson,
+  formatAuditSarif,
+  formatAuditTable,
+  formatSoaJson,
+  formatSoaTable,
+} from './exporters';
+import { buildMarkdownReport, compileAuditPdf } from './pdf_markdown_builder';
+import { evaluateAuditPolicy } from './report_auditor';
+import {
+  computeFleetPostureMetrics,
+  deduplicateAndNormalize,
+  parseRawFindings,
+} from './sarif_ingestor';
+import { AuditPolicyInput, AuditReportData, TlpClassification } from './types';
+
+const VERSION = '0.1.0';
+
+export function printUsage(): void {
+  console.log(`Logihertz Audit Report Generator (lh-report-gen) v${VERSION}`);
+  console.log(
+    'Automated ISO/IEC 27001:2022 & CERT-In PDF 1.4 & Markdown Report Generator\n'
+  );
+  console.log('USAGE:');
+  console.log('    lh-report-gen <SUBCOMMAND> [OPTIONS]\n');
+  console.log('SUBCOMMANDS:');
+  console.log('    scan <policy.json> [--format table|json|sarif] [--output <file>]');
+  console.log('        Audit reporting governance and compliance posture against 10 rules.\n');
+  console.log('    build-pdf <findings.json> --output <report.pdf> [--tlp TLP:AMBER]');
+  console.log('        Compile native %PDF-1.4 binary report from multi-tool SARIF/JSON.\n');
+  console.log('    build-md <findings.json> [--output <report.md>] [--tlp TLP:AMBER]');
+  console.log('        Generate executive Markdown security audit report.\n');
+  console.log('    map-controls <findings.json> [--format table|json]');
+  console.log('        Crosswalk findings to ISO 27001:2022 Annex A, CERT-In & DPDP Act 2023.\n');
+  console.log('FLAGS:');
+  console.log('    -h, --help       Print help information');
+  console.log('    -V, --version    Print version information');
+}
+
+export function main(args: string[]): void {
+  if (args.length === 0) {
+    printUsage();
+    process.exit(2);
+  }
+
+  const sub = args[0];
+
+  if (sub === '-h' || sub === '--help') {
+    printUsage();
+    process.exit(0);
+  }
+
+  if (sub === '-V' || sub === '--version') {
+    console.log(`lh-report-gen ${VERSION}`);
+    process.exit(0);
+  }
+
+  if (sub === 'scan') {
+    handleScan(args.slice(1));
+    return;
+  }
+
+  if (sub === 'build-pdf') {
+    handleBuildPdf(args.slice(1));
+    return;
+  }
+
+  if (sub === 'build-md') {
+    handleBuildMd(args.slice(1));
+    return;
+  }
+
+  if (sub === 'map-controls') {
+    handleMapControls(args.slice(1));
+    return;
+  }
+
+  console.error(`Error: Unknown subcommand '${sub}'\n`);
+  printUsage();
+  process.exit(2);
+}
+
+function handleScan(args: string[]): void {
+  if (args.length === 0) {
+    console.error('Error: scan requires path to policy JSON file.');
+    console.error('Usage: lh-report-gen scan <policy.json> [--format table|json|sarif] [--output <file>]');
+    process.exit(2);
+  }
+
+  const policyPath = args[0];
+  let format = 'table';
+  let outputPath: string | null = null;
+
+  for (let i = 1; i < args.length; i++) {
+    if (args[i] === '--format' && i + 1 < args.length) {
+      format = args[i + 1];
+      i++;
+    } else if (args[i] === '--output' && i + 1 < args.length) {
+      outputPath = args[i + 1];
+      i++;
+    }
+  }
+
+  if (!fs.existsSync(policyPath)) {
+    console.error(`Error: Policy file not found: '${policyPath}'`);
+    process.exit(2);
+  }
+
+  let policy: AuditPolicyInput;
+  try {
+    const raw = fs.readFileSync(policyPath, 'utf8');
+    policy = JSON.parse(raw);
+  } catch (err) {
+    console.error(`Error parsing policy JSON: ${String(err)}`);
+    process.exit(2);
+  }
+
+  const report = evaluateAuditPolicy(policy);
+  let outputStr = '';
+
+  if (format === 'json') {
+    outputStr = formatAuditJson(report);
+  } else if (format === 'sarif') {
+    outputStr = formatAuditSarif(report);
+  } else {
+    outputStr = formatAuditTable(report);
+  }
+
+  if (outputPath) {
+    try {
+      fs.writeFileSync(outputPath, outputStr, 'utf8');
+      console.log(`Report written to ${outputPath}`);
+    } catch (err) {
+      console.error(`Error writing output file: ${String(err)}`);
+      process.exit(2);
+    }
+  } else {
+    console.log(outputStr);
+  }
+
+  process.exit(report.isCompliant ? 0 : 1);
+}
+
+function prepareAuditData(findingsPath: string, tlp: TlpClassification): AuditReportData {
+  if (!fs.existsSync(findingsPath)) {
+    console.error(`Error: Findings file not found: '${findingsPath}'`);
+    process.exit(2);
+  }
+
+  let rawPayload: unknown;
+  try {
+    const content = fs.readFileSync(findingsPath, 'utf8');
+    rawPayload = JSON.parse(content);
+  } catch (err) {
+    console.error(`Error parsing findings JSON: ${String(err)}`);
+    process.exit(2);
+  }
+
+  const rawFindings = parseRawFindings(rawPayload);
+  const { findings, rawCount } = deduplicateAndNormalize(rawFindings, true);
+  const soa = buildStatementOfApplicability(findings);
+  const metrics = computeFleetPostureMetrics(findings, rawCount, soa.complianceRatio);
+
+  const reportId = `LH-AUDIT-${Date.now().toString(36).toUpperCase()}`;
+  const generatedAt = new Date().toISOString();
+
+  return {
+    reportId,
+    generatedAt,
+    organization: 'Logihertz Systems Client Infrastructure',
+    cin: 'U72100MH2025OPC463857',
+    leadAuditor: 'Sameer Tawade <ops@logihertz.com>',
+    tlp,
+    metrics,
+    soa,
+    findings,
+    evidenceSignature: `SEAL-${metrics.evidenceManifestSha256.substring(0, 24).toUpperCase()}`,
+  };
+}
+
+function handleBuildPdf(args: string[]): void {
+  if (args.length === 0) {
+    console.error('Error: build-pdf requires path to findings JSON file.');
+    console.error('Usage: lh-report-gen build-pdf <findings.json> --output <report.pdf> [--tlp TLP:AMBER]');
+    process.exit(2);
+  }
+
+  const findingsPath = args[0];
+  let outputPath: string | null = null;
+  let tlp: TlpClassification = 'TLP:AMBER';
+
+  for (let i = 1; i < args.length; i++) {
+    if (args[i] === '--output' && i + 1 < args.length) {
+      outputPath = args[i + 1];
+      i++;
+    } else if (args[i] === '--tlp' && i + 1 < args.length) {
+      const val = args[i + 1].toUpperCase();
+      if (val === 'TLP:RED' || val === 'TLP:AMBER' || val === 'TLP:GREEN' || val === 'TLP:CLEAR') {
+        tlp = val as TlpClassification;
+      }
+      i++;
+    }
+  }
+
+  if (!outputPath) {
+    console.error('Error: --output <report.pdf> is required for build-pdf.');
+    process.exit(2);
+  }
+
+  const auditData = prepareAuditData(findingsPath, tlp);
+  const pdfBuffer = compileAuditPdf(auditData);
+
+  try {
+    fs.writeFileSync(outputPath, pdfBuffer);
+    console.log(`[OK] Successfully compiled native %PDF-1.4 audit report (${pdfBuffer.length} bytes) to ${outputPath}`);
+    process.exit(0);
+  } catch (err) {
+    console.error(`Error writing PDF output: ${String(err)}`);
+    process.exit(2);
+  }
+}
+
+function handleBuildMd(args: string[]): void {
+  if (args.length === 0) {
+    console.error('Error: build-md requires path to findings JSON file.');
+    console.error('Usage: lh-report-gen build-md <findings.json> [--output <report.md>] [--tlp TLP:AMBER]');
+    process.exit(2);
+  }
+
+  const findingsPath = args[0];
+  let outputPath: string | null = null;
+  let tlp: TlpClassification = 'TLP:AMBER';
+
+  for (let i = 1; i < args.length; i++) {
+    if (args[i] === '--output' && i + 1 < args.length) {
+      outputPath = args[i + 1];
+      i++;
+    } else if (args[i] === '--tlp' && i + 1 < args.length) {
+      const val = args[i + 1].toUpperCase();
+      if (val === 'TLP:RED' || val === 'TLP:AMBER' || val === 'TLP:GREEN' || val === 'TLP:CLEAR') {
+        tlp = val as TlpClassification;
+      }
+      i++;
+    }
+  }
+
+  const auditData = prepareAuditData(findingsPath, tlp);
+  const mdReport = buildMarkdownReport(auditData);
+
+  if (outputPath) {
+    try {
+      fs.writeFileSync(outputPath, mdReport, 'utf8');
+      console.log(`[OK] Successfully generated Markdown audit report to ${outputPath}`);
+      process.exit(0);
+    } catch (err) {
+      console.error(`Error writing Markdown output: ${String(err)}`);
+      process.exit(2);
+    }
+  } else {
+    console.log(mdReport);
+    process.exit(0);
+  }
+}
+
+function handleMapControls(args: string[]): void {
+  if (args.length === 0) {
+    console.error('Error: map-controls requires path to findings JSON file.');
+    console.error('Usage: lh-report-gen map-controls <findings.json> [--format table|json]');
+    process.exit(2);
+  }
+
+  const findingsPath = args[0];
+  let format = 'table';
+
+  for (let i = 1; i < args.length; i++) {
+    if (args[i] === '--format' && i + 1 < args.length) {
+      format = args[i + 1];
+      i++;
+    }
+  }
+
+  const auditData = prepareAuditData(findingsPath, 'TLP:AMBER');
+  if (format === 'json') {
+    console.log(formatSoaJson(auditData.soa));
+  } else {
+    console.log(formatSoaTable(auditData.soa));
+  }
+
+  process.exit(0);
+}
+
+// Invoke main when run directly
+if (require.main === module) {
+  main(process.argv.slice(2));
+}

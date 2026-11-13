@@ -1,0 +1,22 @@
+{
+  "policy_name": "Unreviewed Insecure Audit Governance Policy",
+  "organization_name": "Unchecked Target Corp",
+  "cryptographic_report_signature": false,
+  "embed_sha256_evidence_manifest": false,
+  "certin_6hr_incident_workflow": false,
+  "certin_180d_log_retention_verified": false,
+  "redact_pii_and_secrets_in_evidence": false,
+  "iso27001_soa_mapping_enabled": false,
+  "cwe_crosswalk_enabled": false,
+  "ntp_npl_nic_sync_verified": false,
+  "utc_iso8601_timestamps_enforced": false,
+  "disallow_pdf_javascript_and_actions": false,
+  "sanitize_report_strings": false,
+  "enforce_tlp_classification": false,
+  "encrypt_confidential_distribution": false,
+  "enforce_remediation_sla_deadlines": false,
+  "max_risk_exception_days": 180,
+  "sarif_fingerprint_deduplication": false,
+  "require_auditor_signoff_metadata": false,
+  "archive_worm_retention_years": 1
+}

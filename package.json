@@ -1,0 +1,42 @@
+{
+  "name": "lh-audit-report-gen",
+  "version": "0.1.0",
+  "description": "Production-grade, zero-runtime-dependency TypeScript Automated ISO/IEC 27001:2022 & CERT-In PDF 1.4 & Markdown Security Audit Report Generator, Multi-SARIF v2.1.0 Aggregator, and 10-Rule Compliance Governance Posture Auditor",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "lh-report-gen": "bin/lh-report-gen"
+  },
+  "scripts": {
+    "build": "tsc && tsc -p tsconfig.test.json",
+    "test": "npm run build && node test_dist/run_tests.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Logihertz-Systems-OPC-Pvt-Ltd/lh-audit-report-gen.git"
+  },
+  "keywords": [
+    "iso27001",
+    "cert-in",
+    "dpdp-act",
+    "sarif",
+    "pdf-generator",
+    "audit-report",
+    "security-posture",
+    "compliance"
+  ],
+  "author": "Sameer Tawade <ops@logihertz.com>",
+  "license": "Apache-2.0",
+  "bugs": {
+    "url": "https://github.com/Logihertz-Systems-OPC-Pvt-Ltd/lh-audit-report-gen/issues"
+  },
+  "homepage": "https://github.com/Logihertz-Systems-OPC-Pvt-Ltd/lh-audit-report-gen#readme",
+  "dependencies": {},
+  "devDependencies": {
+    "@types/node": "^20.17.0",
+    "typescript": "^5.6.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

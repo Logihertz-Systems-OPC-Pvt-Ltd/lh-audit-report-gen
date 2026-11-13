@@ -1,0 +1,94 @@
+{
+  "scan_session": "LOGIHERTZ-AUDIT-2026-Q4",
+  "scanned_at": "2026-11-13T12:00:00Z",
+  "findings": [
+    {
+      "tool": "lh-web-audit",
+      "ruleId": "SEC-AUTH-001",
+      "ruleTitle": "Broken Object Level Authorization (BOLA)",
+      "severity": "CRITICAL",
+      "cwe": "CWE-284",
+      "message": "User ID parameter tampering allows unauthenticated access to confidential patient records.",
+      "artifactUri": "src/controllers/patientController.ts",
+      "lineNumber": 42,
+      "snippet": "const authHeader = 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.dummyPayload'; return db.query(req.params.id);"
+    },
+    {
+      "tool": "lh-web-audit",
+      "ruleId": "SEC-AUTH-001",
+      "ruleTitle": "Broken Object Level Authorization (BOLA) - Duplicate",
+      "severity": "CRITICAL",
+      "cwe": "CWE-284",
+      "message": "User ID parameter tampering allows unauthenticated access to confidential patient records.",
+      "artifactUri": "src/controllers/patientController.ts",
+      "lineNumber": 42,
+      "snippet": "const authHeader = 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.dummyPayload'; return db.query(req.params.id);"
+    },
+    {
+      "tool": "lh-secret-scanner",
+      "ruleId": "SEC-LEAK-002",
+      "ruleTitle": "Hardcoded Production AWS Access Key",
+      "severity": "HIGH",
+      "cwe": "CWE-798",
+      "message": "Production cloud infrastructure access key committed in source code configuration.",
+      "artifactUri": "config/aws_s3.env",
+      "lineNumber": 15,
+      "snippet": "AWS_ACCESS_KEY_ID = 'AKIAIOSFODNN7EXAMPLE';\nAWS_SECRET_KEY = 'wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY';"
+    },
+    {
+      "tool": "lh-static-analyser",
+      "ruleId": "SEC-DESER-003",
+      "ruleTitle": "Insecure Deserialization in RPC Handler",
+      "severity": "CRITICAL",
+      "cwe": "CWE-502",
+      "message": "Untrusted binary payload deserialization enables remote code execution on edge node.",
+      "artifactUri": "src/services/telemetryReceiver.ts",
+      "lineNumber": 88,
+      "snippet": "const payload = deserialize(rawBuffer); // CWE-502 vulnerability"
+    },
+    {
+      "tool": "lh-static-analyser",
+      "ruleId": "SEC-CRYPTO-004",
+      "ruleTitle": "Cleartext Transmission of Confidential Token",
+      "severity": "HIGH",
+      "cwe": "CWE-319",
+      "message": "Internal microservice bus transmits unencrypted session tokens over plaintext HTTP.",
+      "artifactUri": "src/transport/httpMesh.ts",
+      "lineNumber": 104,
+      "snippet": "fetch('http://cluster.internal/token', { headers: { 'Authorization': 'Bearer unencrypted_jwt' } });"
+    },
+    {
+      "tool": "lh-static-analyser",
+      "ruleId": "SEC-LOG-005",
+      "ruleTitle": "Insufficient Security Logging of Authentication Failures",
+      "severity": "MEDIUM",
+      "cwe": "CWE-778",
+      "message": "Failed login attempts fail to record remote IP or UTC timestamp for audit retention.",
+      "artifactUri": "src/auth/loginHandler.ts",
+      "lineNumber": 56,
+      "snippet": "if (!valid) { console.error('Login failed'); return false; }"
+    },
+    {
+      "tool": "lh-static-analyser",
+      "ruleId": "SEC-MEM-006",
+      "ruleTitle": "Heap Out-of-Bounds Memory Read in Frame Parser",
+      "severity": "MEDIUM",
+      "cwe": "CWE-125",
+      "message": "Unvalidated packet length field leads to out-of-bounds heap reading in parser loop.",
+      "artifactUri": "src/packet/frameDecoder.ts",
+      "lineNumber": 210,
+      "snippet": "const frame = buffer.slice(offset, offset + packetLen);"
+    },
+    {
+      "tool": "lh-web-audit",
+      "ruleId": "SEC-TIME-007",
+      "ruleTitle": "Missing NPL/NIC Stratum-1 NTP Clock Synchronization",
+      "severity": "LOW",
+      "cwe": "CWE-682",
+      "message": "Local server daemon relies on unsynchronized hardware RTC rather than official NPL/NIC NTP.",
+      "artifactUri": "daemon/timekeeper.conf",
+      "lineNumber": 12,
+      "snippet": "ntp_servers = [ '127.0.0.1' ]; // Non-compliant with CERT-IN-DIR-01"
+    }
+  ]
+}

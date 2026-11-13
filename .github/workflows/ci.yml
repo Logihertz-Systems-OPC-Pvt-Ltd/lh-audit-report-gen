@@ -1,0 +1,57 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    name: Build & Test (Node.js ${{ matrix.node-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: ["20", "22"]
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+
+      - name: Verify zero runtime dependencies
+        run: |
+          node -e '
+            const pkg = require("./package.json");
+            const deps = pkg.dependencies || {};
+            if (Object.keys(deps).length !== 0) {
+              console.error("FAIL: Expected 0 runtime dependencies, found:", deps);
+              process.exit(1);
+            }
+            console.log("OK: Zero runtime dependencies confirmed.");
+          '
+
+      - name: Install build tooling (TypeScript)
+        run: npm install --no-fund --no-audit
+
+      - name: Typecheck and compile TypeScript
+        run: npm run build
+
+      - name: Execute test suite (85+ deterministic assertions)
+        run: npm test
+
+      - name: Smoke test CLI subcommands
+        run: |
+          ./bin/lh-report-gen --version
+          ./bin/lh-report-gen --help
+          ./bin/lh-report-gen scan fixtures/hardened_audit_policy.json
+          ./bin/lh-report-gen scan fixtures/hardened_audit_policy.json --format json
+          ./bin/lh-report-gen scan fixtures/hardened_audit_policy.json --format sarif
+          ./bin/lh-report-gen map-controls fixtures/sample_multi_tool_findings.json
+          ./bin/lh-report-gen build-md fixtures/sample_multi_tool_findings.json --output /tmp/ci_report.md
+          ./bin/lh-report-gen build-pdf fixtures/sample_multi_tool_findings.json --output /tmp/ci_report.pdf

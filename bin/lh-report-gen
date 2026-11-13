@@ -1,0 +1,6 @@
+#!/usr/bin/env node
+const path = require('path');
+const cli = require(path.join(__dirname, '..', 'dist', 'cli.js'));
+if (typeof cli.main === 'function') {
+  cli.main(process.argv.slice(2));
+}
