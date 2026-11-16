@@ -1,0 +1,9 @@
+Package: lh-audit-report-gen
+Version: 0.1.0
+Section: utils
+Priority: optional
+Architecture: amd64
+Maintainer: Sameer Tawade <ops@logihertz.com>
+Homepage: https://www.logihertz.com
+Description: lh-report-gen - Native PDF-1.4 Cross-Reference Binary Offset Invariant
+ Zero-dependency TypeScript ISO/IEC 27001:2022 Annex A & CERT-In compliance audit report generator featuring a native %PDF-1.4 binary compiler, multi-SARIF v2.1.0 deduplicator, and cryptographic evidence sealing.
